@@ -176,12 +176,17 @@ fi
   chcon -R u:object_r:system_file:s0 "$F_TARGETDIR"
   chmod -R 755 "$F_TARGETDIR"
 
-  if ! busybox unzip -l "$ZIPFILE" | grep -q "files/frida-server-$F_ARCH"; then
-    abort "! frida-server for arch '$F_ARCH' not included in this build (phantom-frida may not support this arch)"
+  SERVER_NAME=$(busybox unzip -p "$ZIPFILE" "files/server-name-$F_ARCH" 2>/dev/null || echo "frida-server")
+  SERVER_FILE="${SERVER_NAME}-${F_ARCH}"
+
+  if ! busybox unzip -l "$ZIPFILE" | grep -q "files/${SERVER_FILE}"; then
+    abort "! Server for arch '$F_ARCH' not included in this build (phantom-frida may not support this arch)"
   fi
 
-  busybox unzip -qq -o "$ZIPFILE" "files/frida-server-$F_ARCH" -j -d "$F_TARGETDIR"
-  mv "$F_TARGETDIR/frida-server-$F_ARCH" "$F_TARGETDIR/frida-server"
+  busybox unzip -qq -o "$ZIPFILE" "files/${SERVER_FILE}" -j -d "$F_TARGETDIR"
+  mv "$F_TARGETDIR/${SERVER_FILE}" "$F_TARGETDIR/${SERVER_NAME}"
+
+  echo "$SERVER_NAME" > "$MODPATH/server-name"
 }
 
 # Only some special files require specific permissions
@@ -193,7 +198,8 @@ set_permissions() {
   set_perm_recursive $MODPATH 0 0 0755 0644
 
   # Custom permissions
-  set_perm $MODPATH/system/bin/frida-server 0 2000 0755 u:object_r:system_file:s0
+  SERVER_NAME=$(cat "$MODPATH/server-name" 2>/dev/null || echo "frida-server")
+  set_perm "$MODPATH/system/bin/$SERVER_NAME" 0 2000 0755 u:object_r:system_file:s0
 }
 
 print_modname
@@ -201,7 +207,8 @@ on_install
 set_permissions
 
 [ -f $MODPATH/disable ] && {
-  string="description=Run frida-server on boot: ❌ (failed)"
+  _SN=$(cat "$MODPATH/server-name" 2>/dev/null || echo "frida-server")
+  string="description=Run $_SN on boot: ❌ (failed)"
   sed -i "s/^description=.*/$string/g" $MODPATH/module.prop
 }
 

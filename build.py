@@ -118,7 +118,9 @@ def fill_module(arch: str, frida_tag: str, phantom_release: dict | None = None):
         local_path = PATH_DOWNLOADS.joinpath(filename)
 
         download_file(phantom_release["assets"][phantom_arch], local_path)
-        extract_gz_file(local_path, files_dir.joinpath(f"frida-server-{arch}"))
+        server_name = f"{name}-server"
+        extract_gz_file(local_path, files_dir.joinpath(f"{server_name}-{arch}"))
+        (files_dir / f"server-name-{arch}").write_text(server_name)
     else:
         frida_download_url = (
             f"https://github.com/frida/frida/releases/download/{frida_tag}/"
@@ -127,7 +129,9 @@ def fill_module(arch: str, frida_tag: str, phantom_release: dict | None = None):
         frida_server_path = PATH_DOWNLOADS.joinpath(frida_server)
 
         download_file(frida_download_url + frida_server, frida_server_path)
-        extract_file(frida_server_path, files_dir.joinpath(f"frida-server-{arch}"))
+        server_name = "frida-server"
+        extract_file(frida_server_path, files_dir.joinpath(f"{server_name}-{arch}"))
+        (files_dir / f"server-name-{arch}").write_text(server_name)
 
 
 def create_updater_json(project_tag: str):
