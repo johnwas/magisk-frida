@@ -10,7 +10,8 @@ set -x
 
 wait_for_boot
 
-frida-server -D
+SERVER_NAME=$(cat "$MODPATH/server-name" 2>/dev/null || echo "frida-server")
+"$SERVER_NAME" -D
 
 check_frida_is_up
 
