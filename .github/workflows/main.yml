@@ -10,9 +10,11 @@ on:
         required: false
         default: false
         type: boolean
-  repository_dispatch:
-  schedule:
-    - cron: "8 13 * * *"
+  repository_dispatch:   # 由 phantom-frida 发布后自动触发
+  # schedule:
+  #   - cron: "8 13 * * *"
+  # 如需恢复独立定时模式（从官方 frida 下载），取消上方两行注释，
+  # 同时清空 PHANTOM_FRIDA_REPO variable 即可。
 
 jobs:
   build:
@@ -36,6 +38,7 @@ jobs:
           echo "NEW_TAG=$(cat NEW_TAG.txt)" >> $GITHUB_ENV
         env:
           FORCE_RELEASE: ${{ github.event.inputs.force_release }}
+          PHANTOM_FRIDA_REPO: ${{ vars.PHANTOM_FRIDA_REPO }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
