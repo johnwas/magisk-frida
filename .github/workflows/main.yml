@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: ["master"]
   workflow_dispatch:
     inputs:
       force_release:
@@ -35,10 +33,11 @@ jobs:
       - name: Build
         run: |
           uv run python3 main.py
-          echo "NEW_TAG=$(cat NEW_TAG.txt)" >> $GITHUB_ENV
+          echo "NEW_TAG=$(cat NEW_TAG.txt 2>/dev/null || echo '')" >> $GITHUB_ENV
         env:
           FORCE_RELEASE: ${{ github.event.inputs.force_release }}
           PHANTOM_FRIDA_REPO: ${{ vars.PHANTOM_FRIDA_REPO }}
+          FRIDA_VERSION: ${{ github.event.client_payload.frida_version }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
