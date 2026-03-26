@@ -21,7 +21,14 @@ import os
 
 
 def main():
-    last_frida_tag = util.get_last_frida_tag()
+    # 优先使用 phantom-frida dispatch 提供的版本，无需查询 frida/frida
+    frida_version_override = os.getenv('FRIDA_VERSION', '').strip()
+    if frida_version_override:
+        last_frida_tag = frida_version_override
+        print(f"Using version from phantom-frida dispatch: {last_frida_tag}")
+    else:
+        last_frida_tag = util.get_last_frida_tag()
+
     last_project_tag = util.get_last_project_tag()
     new_project_tag = "0"
 
