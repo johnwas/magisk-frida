@@ -1,4 +1,5 @@
 #!/user/bin/env python3
+import gzip
 import logging
 import lzma
 import os
@@ -54,6 +55,16 @@ def extract_file(archive_path: Path, dest_path: Path):
             out.write(file_content)
 
 
+def extract_gz_file(archive_path: Path, dest_path: Path):
+    logger.info(f"Extracting '{archive_path.name}' to '{dest_path.name}'")
+
+    with gzip.open(archive_path) as f:
+        file_content = f.read()
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest_path, "wb") as out:
+            out.write(file_content)
+
+
 def generate_version_code(project_tag: str) -> int:
     parts = re.split("[-.]", project_tag)
     version_code = "".join(f"{int(part):02d}" for part in parts)
@@ -83,20 +94,40 @@ def create_module(project_tag: str):
     create_module_prop(PATH_BUILD_TMP, project_tag)
 
 
-def fill_module(arch: str, frida_tag: str, project_tag: str):
+# magisk-frida arch names that have a phantom-frida counterpart
+# x86 / x86_64 are not built by phantom-frida
+_PHANTOM_ARCH_MAP = {"arm64": "arm64", "arm": "arm"}
+
+
+def fill_module(arch: str, frida_tag: str, phantom_release: dict | None = None):
     threading.current_thread().setName(arch)
     logger.info(f"Filling module for arch '{arch}'")
 
-    frida_download_url = (
-        f"https://github.com/frida/frida/releases/download/{frida_tag}/"
-    )
-    frida_server = f"frida-server-{frida_tag}-android-{arch}.xz"
-    frida_server_path = PATH_DOWNLOADS.joinpath(frida_server)
-
-    download_file(frida_download_url + frida_server, frida_server_path)
     files_dir = PATH_BUILD_TMP.joinpath("files")
     files_dir.mkdir(exist_ok=True)
-    extract_file(frida_server_path, files_dir.joinpath(f"frida-server-{arch}"))
+
+    if phantom_release is not None:
+        phantom_arch = _PHANTOM_ARCH_MAP.get(arch)
+        if phantom_arch is None or phantom_arch not in phantom_release["assets"]:
+            logger.info(f"No phantom-frida build for arch '{arch}', skipping")
+            return
+
+        name = phantom_release["name"]
+        version = phantom_release["version"]
+        filename = f"{name}-server-{version}-android-{phantom_arch}.gz"
+        local_path = PATH_DOWNLOADS.joinpath(filename)
+
+        download_file(phantom_release["assets"][phantom_arch], local_path)
+        extract_gz_file(local_path, files_dir.joinpath(f"frida-server-{arch}"))
+    else:
+        frida_download_url = (
+            f"https://github.com/frida/frida/releases/download/{frida_tag}/"
+        )
+        frida_server = f"frida-server-{frida_tag}-android-{arch}.xz"
+        frida_server_path = PATH_DOWNLOADS.joinpath(frida_server)
+
+        download_file(frida_download_url + frida_server, frida_server_path)
+        extract_file(frida_server_path, files_dir.joinpath(f"frida-server-{arch}"))
 
 
 def create_updater_json(project_tag: str):
@@ -131,7 +162,7 @@ def package_module(project_tag: str):
     shutil.rmtree(PATH_BUILD_TMP)
 
 
-def do_build(frida_tag: str, project_tag: str):
+def do_build(frida_tag: str, project_tag: str, phantom_release: dict | None = None):
     PATH_DOWNLOADS.mkdir(parents=True, exist_ok=True)
     PATH_BUILD.mkdir(parents=True, exist_ok=True)
 
@@ -140,7 +171,7 @@ def do_build(frida_tag: str, project_tag: str):
     archs = ["arm", "arm64", "x86", "x86_64"]
     executor = concurrent.futures.ProcessPoolExecutor()
     futures = [
-        executor.submit(fill_module, arch, frida_tag, project_tag) for arch in archs
+        executor.submit(fill_module, arch, frida_tag, phantom_release) for arch in archs
     ]
     for future in concurrent.futures.as_completed(futures):
         if future.exception() is not None:

@@ -176,6 +176,10 @@ fi
   chcon -R u:object_r:system_file:s0 "$F_TARGETDIR"
   chmod -R 755 "$F_TARGETDIR"
 
+  if ! busybox unzip -l "$ZIPFILE" | grep -q "files/frida-server-$F_ARCH"; then
+    abort "! frida-server for arch '$F_ARCH' not included in this build (phantom-frida may not support this arch)"
+  fi
+
   busybox unzip -qq -o "$ZIPFILE" "files/frida-server-$F_ARCH" -j -d "$F_TARGETDIR"
   mv "$F_TARGETDIR/frida-server-$F_ARCH" "$F_TARGETDIR/frida-server"
 }

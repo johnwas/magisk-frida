@@ -3,6 +3,44 @@ import requests
 import subprocess
 
 
+# gets phantom-frida release matching a specific frida version
+# tag format: v{frida_version}-{date}, e.g. v17.7.2-20241215
+# returns: {tag, name, port, version, assets: {"arm64": url, "arm": url, ...}}
+def get_phantom_frida_release(repo: str, frida_version: str) -> dict:
+    releases_url = f"https://api.github.com/repos/{repo}/releases"
+    r = requests.get(releases_url)
+    r.raise_for_status()
+
+    matching = [rel for rel in r.json() if rel["tag_name"].startswith(f"v{frida_version}-")]
+    if not matching:
+        raise ValueError(f"No phantom-frida release found for frida {frida_version} in {repo}")
+    release = matching[0]
+
+    info_asset = next(
+        (a for a in release["assets"] if a["name"] == "build-info.json"),
+        None
+    )
+    if info_asset is None:
+        raise ValueError(f"build-info.json not found in release {release['tag_name']}")
+    build_info = requests.get(info_asset["browser_download_url"]).json()
+
+    # key: arch suffix after "android-", e.g. "arm64", "arm"
+    assets = {
+        a["name"].split("-android-")[1].replace(".gz", ""): a["browser_download_url"]
+        for a in release["assets"]
+        if a["name"].endswith(".gz") and "-server-" in a["name"]
+    }
+
+    print(f"Found phantom-frida release: {release['tag_name']} (name={build_info['name']}, archs={list(assets.keys())})")
+    return {
+        "tag": release["tag_name"],
+        "name": build_info["name"],
+        "port": build_info["port"],
+        "version": build_info["version"],
+        "assets": assets,
+    }
+
+
 # 12.7.5-2, 12.7.5-3, ... -> 12.7.5
 def strip_revision(tag) -> str:
     return tag.split('-', 1)[0]
